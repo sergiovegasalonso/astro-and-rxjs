@@ -1,11 +1,116 @@
 ---
-import Welcome from '../components/Welcome.astro';
-import Layout from '../layouts/Layout.astro';
-
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+import Welcome from "../components/Welcome.astro";
+import Layout from "../layouts/Layout.astro";
 ---
 
 <Layout>
-	<Welcome />
+  <Welcome />
 </Layout>
+
+<script>
+  import {
+    Observable,
+    concatAll,
+    concatMap,
+    delay,
+    exhaustAll,
+    exhaustMap,
+    finalize,
+    fromEvent,
+    map,
+    mergeAll,
+    mergeMap,
+    of,
+    switchAll,
+    switchMap,
+  } from "rxjs";
+
+  // basics
+  {
+    // observable
+    const observable = new Observable<number>((subscriber) => {
+      subscriber.next(1);
+      subscriber.next(2);
+      subscriber.next(3);
+      setTimeout(() => {
+        subscriber.next(4);
+        if (Math.random() < 0.5) {
+          // 50% chance of error
+          subscriber.complete();
+        } else {
+          subscriber.error("random errorrrrrrrrrrrr");
+        }
+        subscriber.next(5);
+      }, 1000);
+    });
+
+    // observer
+    const observer = {
+      next: (x: number) => console.log("got value " + x),
+      error: (err: string) => console.error("something wrong occurred: " + err),
+      complete: () => console.log("done"),
+      finalize: () => subscription.unsubscribe(),
+    };
+
+    // subscription
+    const subscription = observable.pipe(map((x) => x * x)).subscribe(observer);
+  }
+
+  // high order observables and combination strategies
+  {
+    const url = "https://api.openbrewerydb.org/v1/breweries";
+    const urls = of(url, url, url, url, url);
+
+    function get(url: string) {
+      return new Observable((subscriber) => {
+        console.log("Starting HTTP request...");
+        fetch(url)
+          .then((res) => {
+            return res.json();
+          })
+          .then((body) => {
+            subscriber.next(body);
+            subscriber.complete();
+          })
+          .catch((err) => subscriber.error(err));
+      }).pipe(delay(2000));
+    }
+
+    const observer = {
+      next: (x: any) => console.log("✅ Received response:", x.length, "breweries"),
+      error: (err: any) => console.error("❌ Error:", err),
+      complete: () => console.log("🏁 Observable completed"),
+	  finalize: () => subscription.unsubscribe()
+    };
+
+    // hasta que no termina cada observable interno no se se ejecuta el siguiente, ideal para casos en los que tenemos que respectar el orden
+    // urls.pipe(concatMap((url) => get(url))).subscribe(observer);
+    // urls.pipe(map((url) => get(url)), concatAll()).subscribe(observer);
+	const subscription = fromEvent(document, "click")
+      .pipe(concatMap(() => get(url)))
+      .subscribe(observer);
+
+    // todos los observables se suscriben al mismo tiempo, ideal para casos en los que podemos permitirnos paralelismo
+    // urls.pipe(mergeMap((url) => get(url))).subscribe(observer);
+    // urls.pipe(map((url) => get(url)), mergeAll()).subscribe(observer);
+	// const subscription = fromEvent(document, "click")
+    //   .pipe(mergeMap(() => get(url)))
+    //   .subscribe(observer);
+
+    // todos los observables se suscriben al mismo tiempo, pero a diferencia del merge, cuando aparece el primer elemento del siguiente observable interno, se elimina
+    // la suscripción al anterior, ideal para, por ejemplo, un autocompletado, donde si escribimos otra letra se debe cancelar el anterior y solo hacer la nueva búsqueda
+    // urls.pipe(switchMap((url) => get(url))).subscribe(observer);
+    // urls.pipe(map((url) => get(url)), switchAll()).subscribe(observer);
+    // const subscription = fromEvent(document, "click")
+    //   .pipe(switchMap(() => get(url)))
+    //   .subscribe(observer);
+
+    // se obvian los elementos del los subsiguientes observables internos hasta que el anterior termina, ideal para guardar formularios, ya que si hacemos tres veces click no
+    // haría falta guardar hasta que no termine la llamada en curso y se vuelva a hacer click
+    // urls.pipe(exhaustMap((url) => get(url))).subscribe(observer);
+    // urls.pipe(map((url) => get(url)), exhaustAll()).subscribe(observer);
+	// const subscription = fromEvent(document, "click")
+    //   .pipe(exhaustMap(() => get(url)))
+    //   .subscribe(observer);
+  }
+</script>
