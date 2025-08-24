@@ -9,7 +9,9 @@ import Layout from "../layouts/Layout.astro";
 
 <script>
   import {
+    BehaviorSubject,
     Observable,
+    Subject,
     concatAll,
     concatMap,
     delay,
@@ -77,23 +79,24 @@ import Layout from "../layouts/Layout.astro";
     }
 
     const observer = {
-      next: (x: any) => console.log("✅ Received response:", x.length, "breweries"),
+      next: (x: any) =>
+        console.log("✅ Received response:", x.length, "breweries"),
       error: (err: any) => console.error("❌ Error:", err),
       complete: () => console.log("🏁 Observable completed"),
-	  finalize: () => subscription.unsubscribe()
+      finalize: () => subscription.unsubscribe(),
     };
 
     // hasta que no termina cada observable interno no se se ejecuta el siguiente, ideal para casos en los que tenemos que respectar el orden
     // urls.pipe(concatMap((url) => get(url))).subscribe(observer);
     // urls.pipe(map((url) => get(url)), concatAll()).subscribe(observer);
-	const subscription = fromEvent(document, "click")
+    const subscription = fromEvent(document, "click")
       .pipe(concatMap(() => get(url)))
       .subscribe(observer);
 
     // todos los observables se suscriben al mismo tiempo, ideal para casos en los que podemos permitirnos paralelismo
     // urls.pipe(mergeMap((url) => get(url))).subscribe(observer);
     // urls.pipe(map((url) => get(url)), mergeAll()).subscribe(observer);
-	// const subscription = fromEvent(document, "click")
+    // const subscription = fromEvent(document, "click")
     //   .pipe(mergeMap(() => get(url)))
     //   .subscribe(observer);
 
@@ -109,8 +112,44 @@ import Layout from "../layouts/Layout.astro";
     // haría falta guardar hasta que no termine la llamada en curso y se vuelva a hacer click
     // urls.pipe(exhaustMap((url) => get(url))).subscribe(observer);
     // urls.pipe(map((url) => get(url)), exhaustAll()).subscribe(observer);
-	// const subscription = fromEvent(document, "click")
+    // const subscription = fromEvent(document, "click")
     //   .pipe(exhaustMap(() => get(url)))
     //   .subscribe(observer);
+  }
+
+  // subjects: both observer and observable
+  {
+    // subject: multicast and no initial value
+    const subject = new Subject<number>();
+
+    const firstSubscription = subject.subscribe((value) =>
+      console.log("Subscriber 1 received:", value)
+    );
+    const secondSubscription = subject.subscribe((value) =>
+      console.log("Subscriber 2 received:", value)
+    );
+
+    subject.next(1);
+    subject.next(2);
+
+    // behaviourSubject: initial value and stores last value
+    const behaviorSubject = new BehaviorSubject<number>(0);
+
+    // First subscriber
+    behaviorSubject.subscribe((value) =>
+      console.log("Subscriber 1 received:", value)
+    );
+
+    // Emit new values
+    behaviorSubject.next(1);
+    behaviorSubject.next(2);
+
+    // Second subscriber joins later
+    behaviorSubject.subscribe((value) =>
+      console.log("Subscriber 2 received:", value)
+    );
+
+    // Emit another value
+    behaviorSubject.next(3);
   }
 </script>
